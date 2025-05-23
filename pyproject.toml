@@ -1,0 +1,14 @@
+[project]
+name = "my-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
+    "torchvision>=0.22.0",
+]
+
+[[tool.uv.index]]
+url = "file:///C:/pythonlibs_fortran_c_hpc/my_project/pytorch-cu121"
