@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import sys
 import os
 import glob
@@ -17,10 +18,23 @@ from PySide6.QtGui import QPixmap
 
 # Fix: Allow truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+=======
+import os
+import cv2
+import ctypes
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import transforms, models
+from PIL import Image
+from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QFileDialog
+>>>>>>> d371162 (Updated deep learning project)
 
 # ==============================#
 #         Configuration
 # ==============================#
+<<<<<<< HEAD
 DATASET_PATHS = [
     "C:/my_cpp_python_gui/FaceForensics/images",
     "C:/my_cpp_python_gui/deep_learning_projects/images",
@@ -125,6 +139,40 @@ def extract_features(image_data):
 
 def extract_single_image_features(img):
     frame_fortran = np.asfortranarray(img, dtype=np.float32)
+=======
+DATASET_PATH = "./faceforensics_data/"
+OUTPUT_DIR = "./processed_frames/"
+MODEL_SAVE_PATH = "./deepfake_detector.pth"
+LIBRARY_PATH = "C:/my_cpp_python_gui/libfeatures.dll"  # Ensure correct path
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ==============================#
+#    Load Fortran Libraries
+# ==============================#
+try:
+    lib_features = ctypes.CDLL(LIBRARY_PATH)
+except Exception as e:
+    print(f"❌ Error loading feature extraction DLL: {e}")
+    exit()
+
+# ==============================#
+#   Feature Extraction Function
+# ==============================#
+def extract_features(image_path):
+    frame = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if frame is None:
+        print(f"⚠ Skipping unreadable image: {image_path}")
+        return None
+
+    try:
+        resized = cv2.resize(frame, (128, 128))
+    except Exception as e:
+        print(f"❌ Resize error: {e}")
+        return None
+
+    frame_fortran = np.asfortranarray(resized, dtype=np.float32)
+>>>>>>> d371162 (Updated deep learning project)
     features = np.zeros(128, dtype=np.float32, order="F")
 
     try:
@@ -139,6 +187,7 @@ def extract_single_image_features(img):
     return features if np.any(features) else None
 
 # ==============================#
+<<<<<<< HEAD
 #  Convert Images to Tensors
 # ==============================#
 def load_images(image_paths, labels):
@@ -160,10 +209,14 @@ train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # ==============================#
 #     Define Model (Fully Connected)
+=======
+#     Define Model (ResNet)
+>>>>>>> d371162 (Updated deep learning project)
 # ==============================#
 class DeepFakeDetector(nn.Module):
     def __init__(self):
         super(DeepFakeDetector, self).__init__()
+<<<<<<< HEAD
         self.fc1 = nn.Linear(128, 64)
         self.fc2 = nn.Linear(64, 1)
         self.sigmoid = nn.Sigmoid()
@@ -210,3 +263,112 @@ def train_model():
 
 train_model()
 print(f"✅ Loaded model from {MODEL_SAVE_PATH}")
+=======
+        self.model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        self.model.fc = nn.Linear(self.model.fc.in_features, 1)  # Binary classification
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.model(x)
+        return self.sigmoid(x)
+
+# ==============================#
+#   Load or Train Model
+# ==============================#
+model = DeepFakeDetector()
+optimizer = optim.Adam(model.parameters(), lr=1e-5)
+criterion = nn.BCELoss()
+
+if os.path.exists(MODEL_SAVE_PATH):
+    try:
+        model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=torch.device('cpu')), strict=False)
+        model.eval()
+        print(f"✅ Loaded model from {MODEL_SAVE_PATH}")
+    except Exception as e:
+        print(f"❌ Model loading error: {e}")
+
+# ==============================#
+#     Train Model with FaceForensics++
+# ==============================#
+feature_files = [f for f in os.listdir(OUTPUT_DIR) if f.endswith(".npy")]
+num_epochs = 10
+
+for epoch in range(num_epochs):
+    total_loss = 0
+    for feat_file in feature_files:
+        features = np.load(os.path.join(OUTPUT_DIR, feat_file))
+        features_tensor = torch.tensor(features, dtype=torch.float).unsqueeze(0).view(1, 3, 128, 128)  # Reshaped input
+        label = torch.tensor([[1.0 if "fake" in feat_file.lower() else 0.0]], dtype=torch.float)
+
+        optimizer.zero_grad()
+        output = model(features_tensor)
+        loss = criterion(output, label)
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+
+    print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss:.6f}")
+
+torch.save(model.state_dict(), MODEL_SAVE_PATH)
+print(f"✅ Model trained & saved to {MODEL_SAVE_PATH}")
+
+# ==============================#
+#  Real-Time Deepfake Detection
+# ==============================#
+def detect_deepfake_live():
+    cap = cv2.VideoCapture(0)
+    transform = transforms.Compose([
+        transforms.Resize((128, 128)),
+        transforms.ToTensor()
+    ])
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        try:
+            resized = cv2.resize(gray, (128, 128))
+        except Exception as e:
+            print(f"❌ Resize error in live detection: {e}")
+            continue
+
+        frame_fortran = np.asfortranarray(resized, dtype=np.float32)
+        features = np.zeros(128, dtype=np.float32, order="F")
+
+        try:
+            lib_features.extract_features(
+                frame_fortran.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                features.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+            )
+        except Exception as e:
+            print(f"❌ Feature extraction error in live detection: {e}")
+            continue
+
+        if not np.any(features):
+            continue
+
+        features_tensor = torch.tensor(features, dtype=torch.float).unsqueeze(0).view(1, 3, 128, 128)
+
+        with torch.no_grad():
+            prediction = model(features_tensor).item()
+            label_str = "Fake" if prediction > 0.5 else "Real"
+
+        cv2.putText(frame, f"Prediction: {label_str}", (10, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        cv2.imshow("Live Deepfake Detection", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+print("🎥 To run live detection, call detect_deepfake_live()")
+
+# Uncomment to run live detection
+# detect_deepfake_live()
+>>>>>>> d371162 (Updated deep learning project)
